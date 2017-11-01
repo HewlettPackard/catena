@@ -1,0 +1,146 @@
+# (C) Copyright 2017 Hewlett Packard Enterprise Development LP.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+# implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+- hosts: all
+  tasks:
+
+#######
+# geth
+#######
+
+  - name: ensure geth repository is present
+    become: yes
+    apt_repository:
+      repo: "ppa:ethereum/ethereum"
+      state: present
+    environment: "{{proxy_env}}"
+
+  - name: ensure packages are installed
+    become: yes
+    apt: name={{item}} state=present
+    environment: "{{proxy_env}}"
+    with_items:
+      - ethereum
+      - nodejs-legacy
+      - npm
+      - git
+      - nginx
+
+  - name: ensure the genesis file is present
+    copy:
+      src: "{{ genesis_file }}"
+      dest: "{{ ansible_env.HOME}}/genesis.json"
+
+  - name: ensure the geth systemd service file is present
+    become: yes
+    copy:
+      src: "{{ playbook_dir }}/geth.service"
+      dest: /etc/systemd/system/geth.service
+
+  # We are using a fork of the eth-netstats repo at this point until the PR is merged: https://github.com/cubedro/eth-netstats/pull/303
+  - name: ensure eth-stats is cloned
+    become: yes
+    git:
+      repo: https://github.com/karalabe/eth-netstats.git
+      dest: /opt/eth-netstats
+    environment: "{{proxy_env}}"
+
+  - name: ensure grunt is installed
+    become: yes
+    npm:
+      name: grunt
+      global: yes
+      state: present
+    environment: "{{proxy_env}}"
+
+  - name: ensure npm packages for eth-stats are installed
+    become: yes
+    npm:
+      path: /opt/eth-netstats
+    environment: "{{proxy_env}}"
+
+  - name: running grunt on freshly cloned eth-netstats
+    become: yes
+    command: grunt
+    args:
+      chdir: /opt/eth-netstats
+
+  - name: ensure the eth-netstats systemd service file is present
+    become: yes
+    copy:
+      src: "{{ playbook_dir }}/eth-netstats.service"
+      dest: /etc/systemd/system/eth-netstats.service
+
+  - name: ensure the secret is in the systemd servie file
+    become: yes
+    lineinfile:
+      dest: "/etc/systemd/system/eth-netstats.service"
+      regexp: "^Environment="
+      line: "Environment=\"WS_SECRET={{ stats_secret }}\""
+
+  - name: ensure the network id is in the systemd service file
+    become: yes
+    lineinfile:
+      dest: "/etc/systemd/system/geth.service"
+      regexp: "^ExecStart="
+      line: "ExecStart=/usr/bin/geth --networkid {{ network_id }} --ethstats %H:{{ stats_secret }}@127.0.0.1:3000 2> /var/log/geth.log"
+
+  - name: ensure geth is stopped (necessary to initialize the blockchain)
+    become: yes
+    systemd:
+      state: stopped
+      daemon_reload: yes
+      name: geth.service
+
+  - name: initialize the ethereum blockchain (it doesn't hurt if this happens more than once)
+    become: yes
+    shell: "/usr/bin/geth init {{ ansible_env.HOME }}/genesis.json 2> /var/log/geth_init.log"
+
+  - name: ensure eth-netstats is started and configured to start automatically after reboot
+    become: yes
+    systemd:
+      state: restarted
+      enabled: yes
+      name: eth-netstats.service
+
+  - name: ensure geth is (re-)started and configured to start automatically after reboot
+    become: yes
+    systemd:
+      state: restarted
+      enabled: yes
+      name: geth.service
+
+  - name: ensure /etc/ansible/facts.d exists
+    become: yes
+    file:
+      path: /etc/ansible/facts.d
+      state: directory
+
+  - name: wait until geth is up and running
+    become: yes
+    wait_for:
+      path: /root/.ethereum/geth.ipc
+
+  - name: save node id as local ansible fact
+    become: yes
+    shell: geth attach ipc:/root/.ethereum/geth.ipc --exec "admin.nodeInfo.id" > /etc/ansible/facts.d/eth_node_id.fact
+
+  - name: doing nodeInfo workaround
+    fetch:
+      src: /etc/ansible/facts.d/eth_node_id.fact
+      dest: "{{ node_id_file }}"
+      flat: true
+

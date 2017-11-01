@@ -1,0 +1,12 @@
+[Unit]
+Description=The geth ethereum client
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart=geth --networkid $network_id --mine --etherbase "0xdf7e6541b9411f8e74daa41ba7a43cdd7d984563"
+Type=simple
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

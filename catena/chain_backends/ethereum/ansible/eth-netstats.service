@@ -1,0 +1,13 @@
+[Unit]
+Description=Ethereum net-stats
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/node /opt/eth-netstats/app.js
+Type=simple
+Restart=always
+Environment="WS_SECRET=test"
+
+[Install]
+WantedBy=multi-user.target

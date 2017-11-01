@@ -1,0 +1,7 @@
+[console_scripts]
+catena-api = catena.cmd.server:main
+catena-manage = catena.cmd.manage:main
+
+[oslo.config.opts]
+catena = catena.common.config:list_opts
+
