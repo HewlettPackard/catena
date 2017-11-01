@@ -1,0 +1,6 @@
+[run]
+branch = True
+source = catena
+
+[report]
+ignore_errors = True
