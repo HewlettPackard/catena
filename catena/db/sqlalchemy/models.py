@@ -225,15 +225,17 @@ class Cloud(BASE, CatenaBase):
         self.cloud_config = json.dumps(cloud_config)
 
 
-def register_models(engine):
+@enginefacade.writer
+def register_models(context):
     """Create database tables for all models with the given engine."""
     models = (Chain, ChainNodes, Cloud)
     for model in models:
-        model.metadata.create_all(engine)
+        model.metadata.create_all(context)
 
 
-def unregister_models(engine):
+@enginefacade.writer
+def unregister_models(context):
     """Remove database tables for all models with the given engine."""
     models = (Chain, ChainNodes, Cloud)
     for model in models:
-        model.metadata.drop_all(engine)
+        model.metadata.drop_all(context)

@@ -21,6 +21,7 @@ import sys
 import tempfile
 
 from oslo_config import cfg
+from oslo_db.sqlalchemy import enginefacade
 from oslo_log import log
 
 from catena.common import config
@@ -34,13 +35,13 @@ LOG = log.getLogger(__name__)
 
 
 def register_models():
-    engine = db_api.get_engine()
-    return models.register_models(engine)
+    context = enginefacade.writer.get_engine()
+    return models.register_models(context)
 
 
 def unregister_models():
-    engine = db_api.get_engine()
-    return models.unregister_models(engine)
+    context = enginefacade.writer.get_engine()
+    return models.unregister_models(context)
 
 
 def output_ssh_key():
