@@ -89,12 +89,10 @@ def create_node(blockchain_id, data):
                                     blockchain)
         node = db_api.create_node(context, id, blockchain, ip, encrypted_key,
                                   data['type'], data['name'])
-        node_id = chain_api.provision_node(blockchain, node,
+        chain_api.provision_node(blockchain, node,
                                            blockchain.get_cloud_config()[
                                                'jumpbox_ip'],
                                            controller_node.ip)
-        chain_config = {'eth_node_id': node_id.split('"')[1]}
-        node.set_chain_config(chain_config)
         node.save(context)
 
     return node
@@ -185,10 +183,8 @@ def create_chain(cloud_id, name, new_chain_config, new_cloud_config):
                                   name=chain.name + '_controller',
                                   type='controller')
 
-        node_id = chain_api.provision_controller(chain, node,
+        chain_api.provision_controller(chain, node,
                                                  cloud_config['jumpbox_ip'])
-        chain_config = {'eth_node_id': node_id.split('"')[1]}
-        node.set_chain_config(chain_config)
         node.save(context)
 
     return chain

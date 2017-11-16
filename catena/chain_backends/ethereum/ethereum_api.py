@@ -101,17 +101,12 @@ def generate_ansible_config(provider_config, cloud_config, chain_config):
     config = {
         "network_id": chain_config['network_id'],
         "stats_secret": chain_config['stats_secret'],
+        "images": {
+            "etcd": "gcr.io/etcd-development/etcd",
+            "ethereum_geth": "docker.io/hpecatena/ethereum-geth",
+            "ethereum_stats": "docker.io/hpecatena/ethereum-stats"
         }
-
-    if "proxy" in provider_config:
-        config["proxy_env"] = {
-            "http_proxy": provider_config["proxy"],
-            "https_proxy": provider_config["proxy"],
-            "ftp_proxy": provider_config["proxy"],
-            "no_proxy": "localhost,127.0.0.1"
-            }
-    else:
-        config["proxy_env"] = {}
+    }
 
     return config
 
@@ -123,7 +118,6 @@ def provision_controller(chain, node, jumpbox_ip):
 
     dir_path = os.path.dirname(os.path.realpath(__file__))
     playbook_path = os.path.join(dir_path, 'ansible', 'deploy-controller.yml')
-    node_id_file = os.path.join('/tmp', 'ansible_node_id_' + node.id)
 
     config = generate_ansible_config(provider_config, cloud_config,
                                      chain_config)
@@ -145,34 +139,10 @@ def provision_controller(chain, node, jumpbox_ip):
                     temp_node_ssh.name, temp_jumpbox_ssh.name))
 
             config["genesis_file"] = temp_genesis.name
-            config["node_id_file"] = node_id_file
 
             ansible_utils.launch_playbook(playbook_path, temp_node_ssh.name,
                                           [node.ip], config, jumpbox_ip,
                                           temp_jumpbox_ssh.name)
-    try:
-        with open(node_id_file, 'r') as node_id:
-            return node_id.read()
-    finally:
-        os.unlink(node_id_file)
-
-
-def _get_bootnodes(chain):
-    chain_config = chain.get_chain_config()
-    bootnodes = chain_config.get('external_bootnodes', [])
-    if bootnodes is None:
-        bootnodes = []
-
-    for node in chain.nodes:
-        node_chain_config = node.get_chain_config()
-
-        if 'eth_node_id' in node_chain_config:  # Nodes that are currently
-            # provisioned may not have a enode id yet
-            bootnodes.append(
-                'enode://{}@{}:30303'.format(node_chain_config['eth_node_id'],
-                                             node.ip))
-
-    return ",".join(bootnodes)
 
 
 def provision_node(chain, node, jumpbox_ip, controller_ip):
@@ -182,8 +152,6 @@ def provision_node(chain, node, jumpbox_ip, controller_ip):
 
     dir_path = os.path.dirname(os.path.realpath(__file__))
     playbook_path = os.path.join(dir_path, 'ansible', 'deploy-geth.yml')
-    node_id_file = os.path.join('/tmp', 'ansible_node_id_' + node.id)
-    bootnodes = _get_bootnodes(chain)
 
     config = generate_ansible_config(provider_config, cloud_config,
                                      chain_config)
@@ -206,20 +174,12 @@ def provision_node(chain, node, jumpbox_ip, controller_ip):
                     temp_node_ssh.name, temp_jumpbox_ssh.name))
 
             config["genesis_file"] = temp_genesis.name
-            config["node_id_file"] = node_id_file
-            config["stats_ip"] = controller_ip
-            config["bootnodes"] = bootnodes
+            config["controller_node"] = controller_ip
             config["etherbase"] = chain_config['mining_account']
 
             ansible_utils.launch_playbook(playbook_path, temp_node_ssh.name,
                                           [node.ip], config, jumpbox_ip,
                                           temp_jumpbox_ssh.name)
-
-    try:
-        with open(node_id_file, 'r') as node_id:
-            return node_id.read()
-    finally:
-        os.unlink(node_id_file)
 
 
 def get_backend_info():
