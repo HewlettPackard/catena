@@ -21,4 +21,4 @@ python-glanceclient>=2.7.0  # Apache-2.0
 python-neutronclient>=6.3.0  # Apache-2.0
 python-novaclient>=9.0.0  # Apache-2.0
 openstacksdk==0.9.17  # Apache-2.0
-pycryptodome==3.4.7 # BSD 2-clause
+pycryptodome==3.6.6 # BSD 2-clause
